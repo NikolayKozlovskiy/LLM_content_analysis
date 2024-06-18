@@ -1,0 +1,12 @@
+pandas
+uuid
+gnews
+newspaper3k
+nltk
+psycopg2-binary
+lxml[html_clean]
+openpyxl
+sqlalchemy
+plotly
+ipython
+
