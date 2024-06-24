@@ -10,7 +10,7 @@ services:
     volumes:
       - .:/usr/src/app
     env_file:
-      - .env.dev
+      - ./.env.dev
     ports:
       - "8888:8888"
     depends_on:
@@ -21,9 +21,9 @@ services:
     image: postgres
     container_name: db_pg_dev
     volumes:
-      - ~/.postgres/data:/var/lib/postgresql/data
+      - ./.postgres_data:/var/lib/postgresql/data
     env_file:
-      - .env.dev
+      - ./.env.dev
     ports:
       - "5431:5432"
     healthcheck:
