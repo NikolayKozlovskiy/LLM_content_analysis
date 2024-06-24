@@ -8,8 +8,8 @@ import re
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import execute_values
+import time
 import os
-import time  # Make sure to import the time module
 
 # Download the NLTK 'punkt' resource
 nltk.download('punkt')
@@ -18,6 +18,7 @@ nltk.download('punkt')
 google_news = GNews(language='en', country='DE', start_date=(2018, 6, 1), end_date=(2024, 12, 31))
 
 def fetch_news_for_keyword(keyword, max_results=20):
+    # Fetch news articles for the provided keyword
     articles = google_news.get_news(keyword)
     news_results = []
     count = 0
@@ -40,6 +41,7 @@ def fetch_news_for_keyword(keyword, max_results=20):
     return news_results
 
 def fetch_news_for_keywords(keywords, max_results=20):
+    # Fetch news for the full keyword string
     return fetch_news_for_keyword(keywords, max_results)
 
 def fetch_article_text(url, retries=3):
@@ -56,7 +58,7 @@ def fetch_article_text(url, retries=3):
             }
         except Exception as e:
             last_exception = e
-            time.sleep(2)
+            time.sleep(2)  # Sleep before retrying
     return {
         'Clean main text': '',
         'Summary': '',
@@ -64,48 +66,60 @@ def fetch_article_text(url, retries=3):
     }
 
 def sanitize_text(text):
+    # Remove illegal characters for Excel
     return re.sub(r'[^\x00-\x7F]+', ' ', text)
 
 def format_publisher(publisher_info):
+    # Extract the title from the publisher dictionary
     if isinstance(publisher_info, dict):
         return publisher_info.get('title', 'Unknown')
     return publisher_info
 
 def format_date(date_str):
+    # Format the date to "Month Year"
     try:
         date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
         return date_obj.strftime('%b %Y')
     except ValueError:
         return date_str
-
 def add_news_columns(df, keywords_column, max_results=20):
+    # Forward fill to handle merged cells
     df.ffill(inplace=True)
+
+    # Ensure the required columns are present in the DataFrame
     for col in ['Risk category (short description)', 'country', 'sector']:
         if col not in df.columns:
             df[col] = ''
 
     all_news = df[keywords_column].apply(lambda x: fetch_news_for_keywords(x, max_results))
+
+    # Flatten the list of news articles into separate rows
     news_flat = [item for sublist in all_news for item in sublist]
     news_df = pd.DataFrame(news_flat)
 
+    # Debug print statement to check column names
     print("Columns in news_df after flattening:", news_df.columns)
 
+    # Fetch and add article text, summary, and download status
     with concurrent.futures.ThreadPoolExecutor() as executor:
         article_texts = list(executor.map(fetch_article_text, news_df['URL']))
 
     text_df = pd.DataFrame(article_texts)
     news_df = pd.concat([news_df, text_df], axis=1)
 
-    success_count = news_df[news_df['Download Status'] == 'Success'].shape[0]
-    total_count = news_df.shape[0]
-    print(f"Successfully downloaded {success_count} out of {total_count} articles.")
-
+    # Add upload timestamp
     news_df['Upload timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Add language of retrieval
     news_df['Language of retrieval'] = 'en'
 
+    # Merge original columns with the new news data
     expanded_df = pd.merge(df, news_df, left_on=keywords_column, right_on='Prompt', how='right')
+
+    # Add download status to the merged DataFrame
     expanded_df['Download Status'] = news_df['Download Status']
 
+    # Reorder columns as specified and drop any extra columns
     columns_order = [
         'Uuid', 'Risk category (short description)', 'country', 'Language of retrieval', 'sector',
         'Prompt', 'Search engine', 'URL', 'Type of document', 'Clean main text', 'Published date',
@@ -143,7 +157,7 @@ def create_table_if_not_exists():
         clean_main_text TEXT,
         published_date VARCHAR(1024),
         publisher VARCHAR(1024),
-        title TEXT,
+        title TEXT UNIQUE,
         keywords TEXT,
         summary TEXT,
         upload_timestamp TIMESTAMP,
@@ -168,7 +182,7 @@ def save_to_postgresql(df):
     insert_query = """
     INSERT INTO news_data (Uuid, risk_category, country, language_of_retrieval, sector, prompt, search_engine, url, type_of_document, clean_main_text, published_date, publisher, title, keywords, summary, upload_timestamp, download_status)
     VALUES %s
-    ON CONFLICT (Uuid) DO NOTHING;
+    ON CONFLICT (title) DO NOTHING;
     """
 
     max_lengths = {
@@ -201,6 +215,9 @@ def save_to_postgresql(df):
         )
         for index, row in df.iterrows()
     ]
+
+    # Check for duplicates in the DataFrame
+    df.drop_duplicates(subset=['Title'], keep='last', inplace=True)
 
     execute_values(cursor, insert_query, values)
 
