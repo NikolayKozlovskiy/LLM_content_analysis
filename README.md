@@ -59,13 +59,13 @@ Place your Excel file in the data directory.
 *Running the Scraping Script*
 To run the scraping script:
 
- ``bash
+ ```bash
 docker-compose run app scraping /data/Your-excel-file.xlsx
 
 *Running the Data Analysis Script*
 To run the data analysis script:
 
-``bash
+```bash
 docker-compose run app data_analysis
 
 
@@ -96,12 +96,12 @@ POSTGRES_PORT: The port number for the PostgreSQL database.Ensure these variable
 
 If you encounter any issues with the containers, try rebuilding them:
 
-``bash
+```bash
 docker-compose up --build
 
 To stop the containers:
 
-``bash
+```bash
 docker-compose down
 
 **License**
