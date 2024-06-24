@@ -11,25 +11,18 @@ This project is an automated pipeline designed for news scraping, natural langua
 
 ## Project Structure
 
+```plaintext
 my_project/
-
 ├── data/
-
-│ └── 01_Social_listening_Nicaragua_Miriam_Done.xlsx
-
+│   └── 01_Social_listening_Nicaragua_Miriam_Done.xlsx
 ├── docker-compose.yml
-
 ├── Dockerfile
-
 ├── entrypoint.py
-
 ├── requirements.txt
-
 ├── data_analysis.py
-
 ├── figures/
-
 └── scraping.py
+```
 
 
 ## Setup
@@ -42,75 +35,82 @@ my_project/
 ### Initial Setup
 
 1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/NikolayKozlovskiy/dkv_auto_search.git
-   cd dkv_auto_search
+
+    ```bash
+    git clone https://github.com/NikolayKozlovskiy/dkv_auto_search.git
+    cd dkv_auto_search
+    ```
 
 2. **Add your Excel file**:
 
-Place your Excel file in the data directory.
+    Place your Excel file in the `data` directory.
 
-4. *Build and run the Docker containers*:
-   ```bash
-   docker-compose up --build
+3. **Build and run the Docker containers**:
 
+    ```bash
+    docker-compose up --build
+    ```
 
-**Usage**
-*Running the Scraping Script*
+### Usage
+
+#### Running the Scraping Script
+
 To run the scraping script:
 
- ```bash
-docker-compose run app scraping /data/Your-excel-file.xlsx
+    ```bash
+    docker-compose run app scraping /data/Your-excel-file.xlsx
+    ```
 
-*Running the Data Analysis Script*
+#### Running the Data Analysis Script
+
 To run the data analysis script:
 
-```bash
-docker-compose run app data_analysis
+    ```bash
+    docker-compose run app data_analysis
+    ```
 
+## Output
 
-**Output**
-*Figures*:
-The generated HTML files will be saved in the figures directory.
+### Figures
 
-figures/total_urls.html
+The generated HTML files will be saved in the `figures` directory.
 
-figures/urls_by_year.html
+- `figures/total_urls.html`
+- `figures/urls_by_year.html`
+- `figures/download_status.html`
 
-figures/download_status.html
+### Environment Variables
 
-*Environment Variables*
-The following environment variables are used in the docker-compose.yml file:
+The following environment variables are used in the `docker-compose.yml` file:
 
-POSTGRES_DB: The name of the PostgreSQL database.
+- `POSTGRES_DB`: The name of the PostgreSQL database.
+- `POSTGRES_USER`: The PostgreSQL user.
+- `POSTGRES_PASSWORD`: The password for the PostgreSQL user.
+- `POSTGRES_HOST`: The hostname for the PostgreSQL database.
+- `POSTGRES_PORT`: The port number for the PostgreSQL database.
 
-POSTGRES_USER: The PostgreSQL user.
+Ensure these variables are correctly set in the `docker-compose.yml` file before running the containers.
 
-POSTGRES_PASSWORD: The password for the PostgreSQL user.
-
-POSTGRES_HOST: The hostname for the PostgreSQL database.
-
-POSTGRES_PORT: The port number for the PostgreSQL database.Ensure these variables are correctly set in the docker-compose.yml file before running the containers.
-
-**Troubleshooting**
+## Troubleshooting
 
 If you encounter any issues with the containers, try rebuilding them:
 
-```bash
-docker-compose up --build
+    ```bash
+    docker-compose up --build
+    ```
 
 To stop the containers:
 
-```bash
-docker-compose down
+    ```bash
+    docker-compose down
+    ```
 
-**License**
+## License
+
 This project is licensed under the MIT License.
 
-**Acknowledgments**
+## Acknowledgments
 
-GNews API
-
-Newspaper3k
-
-Plotly
+- GNews API
+- Newspaper3k
+- Plotly
