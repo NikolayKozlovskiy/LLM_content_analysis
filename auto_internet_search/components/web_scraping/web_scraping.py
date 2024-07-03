@@ -1,23 +1,43 @@
+import time
+import logging
+import re
+import pandas as pd
 from datetime import datetime
 from gnews import GNews
+from newspaper import Article
 
+from auto_internet_search.core.functions import delete_directory, check_or_create_dir, save_to_excel_country_rc_level
 from auto_internet_search.core.constants.risk_categories import RiskCategories
 from auto_internet_search.core.constants.key_words import KeyWords
 
 class WebScraping():
 
+    default_prompt_lang = 'en'
+    default_data_source = 'google_news'
+
+    default_commodity = "coffee"
     default_risk_categories = ['child_labour', 'worst_form_child_labour']
     default_countries = ['Nicaragua']
 
-    default_prompt_lang = 'en'
-
     prompt_dict = {
-        'child_labour' : [RiskCategories.child_labour, KeyWords.child_labour], 
-        'worst_form_child_labour' : [RiskCategories.worst_form_child_labour, KeyWords.worst_form_child_labour]
+        'child_labour': [RiskCategories.child_labour, KeyWords.child_labour],
+        'worst_form_child_labour': [RiskCategories.worst_form_child_labour, KeyWords.worst_form_child_labour],
+        'forced_labour': [RiskCategories.forced_labour, KeyWords.forced_labour],
+        'slavery': [RiskCategories.slavery, KeyWords.slavery],
+        'work_related_health': [RiskCategories.work_related_health, KeyWords.work_related_health],
+        'freedom_association': [RiskCategories.freedom_association, KeyWords.freedom_association],
+        'no_discrimination': [RiskCategories.no_discrimination, KeyWords.no_discrimination],
+        'withholding_wage': [RiskCategories.withholding_wage, KeyWords.withholding_wage],
+        'soil_water_noise_emission': [RiskCategories.soil_water_noise_emission, KeyWords.soil_water_noise_emission],
+        'unlawful_eviction': [RiskCategories.unlawful_eviction, KeyWords.unlawful_eviction],
+        'hiring_private_forces': [RiskCategories.hiring_private_forces, KeyWords.hiring_private_forces],
+        'chemicals_stockholm_convention': [RiskCategories.chemicals_stockholm_convention, KeyWords.chemicals_stockholm_convention]
     }
+
 
     def __init__(self, component_config) -> None:
         self.config = component_config
+        self.logger = logging.getLogger(__name__)
 
         self.risk_categories = self.config.geteval("risk_categories", fallback=self.default_risk_categories)
         self.countries = self.config.geteval("countries", fallback=self.default_countries)
@@ -26,16 +46,108 @@ class WebScraping():
         self.end_date = self.config.geteval("end_date", fallback=datetime.now())
         self.max_results = self.config.getint("max_results", fallback=20)
 
+        self.do_clear_output = self.config.getboolean("do_clear_output", fallback=False)
+        self.output_dir = self.config.get("output_dir")
+
+        if self.do_clear_output:
+            delete_directory(self.output_dir)
+        check_or_create_dir(self.output_dir)
+
+    def retrive_all_info(self, 
+                         news_item, 
+                         prompt,
+                         country,
+                         risk_category,
+                         commodity,
+                         lang, 
+                         data_source
+                         ): 
+        result = []
+
+        result.extend([country, risk_category, commodity, lang, prompt, data_source])
+        
+        news_item_url = news_item['url']
+        clean_text, down_state = self.fetch_article_text(news_item_url)
+
+        result.extend([news_item_url,
+                       news_item['title'], 
+                       self.format_date(news_item['published date']), 
+                       self.format_publisher(news_item.get('publisher', 'Unknown')), 
+                       down_state,
+                       datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+                       clean_text
+                    ])
+
+        return result
+    
+    def fetch_article_text(self, news_item_url, retries=3):
+        for _ in range(retries):
+            try:
+                article = Article(news_item_url, http_success_only=False, fetch_images=False, language=self.default_prompt_lang)
+                article.download()
+                article.parse()
+
+                return (self.sanitize_text(article.text), 'Success')
+            except Exception as e:
+                last_exception = e
+                time.sleep(2)  # Sleep before retrying
+        
+        return ("", str(last_exception))
+    
+    def sanitize_text(self, text):
+        # Remove illegal characters for Excel
+        return re.sub(r'[^\x00-\x7F]+', ' ', text)
+    
+    def format_publisher(self, publisher_info):
+    # Extract the title from the publisher dictionary
+        if isinstance(publisher_info, dict):
+            return publisher_info.get('title', 'Unknown')
+        return publisher_info
+
+    def format_date(self, date_str):
+        # Format the date to "Month Year"
+        try:
+            date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
+            return date_obj.strftime('%b %Y')
+        except ValueError:
+            return date_str
+    
+
+    def retrive_web_scraping_info_per_country_risk(self, country_risk_articles, country_risk_prompts, country, risk_category): 
+        result_list = [self.retrive_all_info(news_item, prompt, country, risk_category, self.default_commodity, self.default_prompt_lang, self.default_data_source) for news_item, prompt in zip(country_risk_articles, country_risk_prompts)]
+
+        return result_list
+    
+
     def run(self)-> None: 
         google_news = GNews(language=self.default_prompt_lang, start_date=self.start_date, end_date=self.end_date, max_results=self.max_results)
 
+        previous_country = None
         for country in self.countries:
+            self.logger.info(f"Web Scraping for country: {country} started")
             for risk_category in self.risk_categories:
+                country_risk_articles = []
+                country_risk_prompts = []
                 if risk_category in self.prompt_dict.keys():
+                    self.logger.info(f"Starting risk category: {risk_category}")
                     for key_words in self.prompt_dict[risk_category][1]:
 
-                        prompt = f'{key_words} "{country}" "coffee"'
-                        articles = google_news.get_news(prompt)
-                        print(len(articles))
+                        prompt = f'{key_words} "{country}" "{self.default_commodity}"'
+                        google_news_results = google_news.get_news(prompt)
+                        country_risk_articles.extend(google_news_results)
+                        country_risk_prompts.extend([prompt]*len(google_news_results))
+                        self.logger.info(f"Stats per prompt: {prompt} -> {len(country_risk_articles)}")
+
+                    result_per_country_risk = self.retrive_web_scraping_info_per_country_risk(country_risk_articles, country_risk_prompts, country, self.prompt_dict[risk_category][0])
+
+                    if country != previous_country:
+                        mode = 'w'
+                    else:
+                        mode = 'a'
+
+                    save_to_excel_country_rc_level(country, risk_category, result_per_country_risk, self.output_dir, mode)
+                    self.logger.info(f"Results for {country}, {risk_category} is written to {self.output_dir} directory")
+                    previous_country = country
                 else:
+                    self.logger.warning(f"Unknown risk_category: {risk_category}")
                     continue
