@@ -45,7 +45,7 @@ def check_or_create_dir(directory: str) -> None:
         print(f"Unable to handle input directory path '{directory}': {e}")
         raise
 
-def save_to_excel_country_rc_level(country, risk_category, df, output_dir, mode):
+def save_to_excel_country_risk_level(country, risk_category, df, output_dir, mode):
     
     COLUMN_NAMES = [
         ColNames.country,
@@ -58,9 +58,9 @@ def save_to_excel_country_rc_level(country, risk_category, df, output_dir, mode)
         ColNames.title,
         ColNames.published_date,
         ColNames.publisher,
-        ColNames.download_state,
-        ColNames.upload_time,
         ColNames.article_clean_text,
+        ColNames.download_state,
+        ColNames.upload_time
     ]
 
     file_path = f'{output_dir}/{country}.xlsx'
