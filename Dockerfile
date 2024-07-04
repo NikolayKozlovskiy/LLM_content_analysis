@@ -14,7 +14,7 @@ COPY . .
 
 ARG install_dir=/tmp/install
 # Standard requirements
-COPY resources/requirements.txt ${install_dir}/requirements.txt
+COPY resources/requirements/requirements.txt ${install_dir}/requirements.txt
 RUN pip3 install -r ${install_dir}/requirements.txt
 
 # Verify openpyxl installation
