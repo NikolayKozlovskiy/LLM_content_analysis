@@ -46,6 +46,7 @@ def check_or_create_dir(directory: str) -> None:
         raise
 
 def save_to_excel_country_risk_level(country, risk_category, df, output_dir, mode):
+
     
     COLUMN_NAMES = [
         ColNames.country,

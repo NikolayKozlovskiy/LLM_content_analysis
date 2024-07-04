@@ -36,7 +36,7 @@ class WebScraping:
     def __init__(self, component_config) -> None:
         self.config = component_config
         self.logger = logging.getLogger(__name__)
-
+        
         self.risk_categories = self.config.geteval("risk_categories", fallback=self.DEFAULT_RISK_CATEGORIES)
         self.countries = self.config.geteval("countries", fallback=self.DEFAULT_COUNTRIES)
 
