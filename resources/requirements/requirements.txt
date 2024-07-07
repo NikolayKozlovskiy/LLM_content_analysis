@@ -13,3 +13,4 @@ ipython
 openai
 configparser
 jupyterlab
+tiktoken
