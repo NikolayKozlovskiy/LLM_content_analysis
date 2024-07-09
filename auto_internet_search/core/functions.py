@@ -61,11 +61,14 @@ def save_to_excel_country_risk_level(country, risk_category, df, output_dir, mod
         ColNames.publisher,
         ColNames.article_clean_text,
         ColNames.download_state,
-        ColNames.upload_time
+        ColNames.upload_time,
+        ColNames.manual_check_suggested,
+        ColNames.reason_for_manual_check
     ]
 
     file_path = f'{output_dir}/{country}.xlsx'
     with pd.ExcelWriter(file_path, engine='openpyxl', mode=mode) as writer:
             df = pd.DataFrame(df, columns=COLUMN_NAMES)
+            df[ColNames.manual_check_suggested] = df[ColNames.manual_check_suggested].astype(int)  # Ensure the column is int
             df.to_excel(writer, sheet_name=risk_category, index=False)
 

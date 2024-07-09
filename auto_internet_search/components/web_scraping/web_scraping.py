@@ -43,6 +43,7 @@ class WebScraping:
         self.start_date = self.config.geteval("start_date")
         self.end_date = self.config.geteval("end_date", fallback=datetime.now())
         self.max_results = self.config.getint("max_results", fallback=20)
+        self.text_length_threshold = self.config.getint("text_length_threshold", fallback=50)  # Add this line
 
         self.do_clear_output = self.config.getboolean("do_clear_output", fallback=False)
         self.output_dir = self.config.get("output_dir")
@@ -52,6 +53,7 @@ class WebScraping:
         check_or_create_dir(self.output_dir)
 
     def retrieve_all_info(self, news_item, prompt, country, risk_category, commodity, lang, data_source):
+        article_text, download_state = self.fetch_article_text(news_item['url'])
         result = [
             country,
             risk_category,
@@ -63,9 +65,18 @@ class WebScraping:
             news_item['title'],
             self.format_date(news_item['published date']),
             self.format_publisher(news_item.get('publisher', 'Unknown')),
-            *self.fetch_article_text(news_item['url']),
+            article_text,
+            download_state,
             datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ]
+
+        text_length = len(article_text)
+        manual_check_suggested = download_state != 'Success' or text_length < self.text_length_threshold
+        reason_for_manual_check = 'Download failed' if download_state != 'Success' else (
+            'Text retrieved is too small' if text_length < self.text_length_threshold else '')
+
+        result.extend([manual_check_suggested, reason_for_manual_check])
+
         return result
 
     def fetch_article_text(self, news_item_url, retries=3):
