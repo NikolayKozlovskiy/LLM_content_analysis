@@ -1,6 +1,6 @@
 .DS_Store
 .postgres_data
-.pgadmin-data/
+.pgadmin-data
 logs
 data
 # Byte-compiled / optimized / DLL files
