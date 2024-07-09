@@ -1,4 +1,11 @@
 class KeyWords():
+    """Represents categories' prompting canvases.
+
+    This class contains attributes that are lists of keywords related to specific
+    categories. Each attribute corresponds to a specific category and contains
+    keywords or phrases associated with that category.
+    """
+
     child_labour = [
         "Child labour", 
         "Child labour compulsory schooling", 

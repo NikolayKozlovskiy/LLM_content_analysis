@@ -1,4 +1,8 @@
 class RiskCategories():
+    """Represents full names of risk categories
+
+    The name of each attribute is a short version of risk category naming
+    """
     child_labour = "Child labour (< 15 yrs)"
     worst_form_child_labour = "Worst form of child labour (< 18 yrs)"
     forced_labour="Forced labour"

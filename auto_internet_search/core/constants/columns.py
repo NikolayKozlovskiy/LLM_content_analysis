@@ -1,4 +1,10 @@
 class ColNames: 
+
+    """Represents column names for writing datasets.
+
+    This class contains constant attributes that represent the names of columns 
+    used in schema creation of files. Each attribute corresponds to a specific column name.
+    """
     country = 'country'
     risk_category_full_name='risk_category_full_name'
     commodity='commodity'
