@@ -74,7 +74,7 @@ class WebScraping:
     def retrieve_all_info(self, news_item, prompt, country, risk_category, commodity, lang, data_source):
 
         download_state, article_text = self.fetch_article_text(news_item['url'])
-        manual_check_suggested, reason_for_manual_check = self.check_manual_aplicability(download_state, article_text)
+        manual_check_suggested, reason_for_manual_check = self.manual_check_aplicability(download_state, article_text)
 
         result = [
             country,
@@ -108,7 +108,7 @@ class WebScraping:
                 time.sleep(2)
         return str(last_exception), None
     
-    def check_manual_aplicability(self, download_state, article_text): 
+    def manual_check_aplicability(self, download_state, article_text): 
 
         download_successful = download_state == 'Success'
         text_meets_length_requirement = len(article_text) >= self.text_length_threshold
