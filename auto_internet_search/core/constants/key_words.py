@@ -39,7 +39,7 @@ class KeyWords():
 
     freedom_association = [
         "Freedom association",
-        "Dreedom trade unions",
+        "Freedom trade unions",
         "Discrimination trade union"
     ]
 

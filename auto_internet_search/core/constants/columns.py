@@ -12,3 +12,5 @@ class ColNames:
     download_state='download_state'
     upload_time='upload_time'
     article_clean_text='article_clean_text'
+    manual_check_suggested = 'manual_check_suggested' 
+    reason_for_manual_check = 'reason_for_manual_check' 
