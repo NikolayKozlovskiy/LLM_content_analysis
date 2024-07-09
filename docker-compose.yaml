@@ -28,7 +28,8 @@ services:
     image: postgres
     container_name: db_pg_dev
     volumes:
-      - ./.postgres_data:/var/lib/postgresql/data
+      - .postgres_data:/var/lib/postgresql/data
+      - .stupid_data:/var/lib/postgresql/data
     env_file:
       - ./.env.dev
     ports:
