@@ -2,6 +2,7 @@ import time
 import logging
 import re
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from gnews import GNews
 from newspaper import Article
 
@@ -10,8 +11,8 @@ from auto_internet_search.core.constants.risk_categories import RiskCategories
 from auto_internet_search.core.constants.key_words import KeyWords
 from auto_internet_search.core.constants.columns import ColNames
 
-
 class WebScraping:
+    """A class to perform web scraping for news articles related to social risk categories."""
 
     DEFAULT_PROMPT_LANG = 'en'
     DEFAULT_DATA_SOURCE = 'google_news'
@@ -53,17 +54,21 @@ class WebScraping:
     ]
 
     def __init__(self, component_config) -> None:
+        """Initializes the WebScraping class with configuration parameters.
+
+        Args:
+            component_config (ConfigParser): Configuration parser object containing parameters.
+        """
         self.config = component_config
         self.logger = logging.getLogger(__name__)
         
         self.risk_categories = self.config.geteval("risk_categories", fallback=self.DEFAULT_RISK_CATEGORIES)
         self.countries = self.config.geteval("countries", fallback=self.DEFAULT_COUNTRIES)
-
         self.start_date = self.config.geteval("start_date")
         self.end_date = self.config.geteval("end_date", fallback=datetime.now())
         self.max_results = self.config.getint("max_results", fallback=20)
-        self.text_length_threshold = self.config.getint("text_length_threshold", fallback=50)  # Add this line
-
+        self.text_length_threshold = self.config.getint("text_length_threshold", fallback=50)
+        self.max_workers = self.config.getint("max_workers", fallback=5)
         self.do_clear_output = self.config.getboolean("do_clear_output", fallback=False)
         self.output_dir = self.config.get("output_dir")
 
@@ -71,10 +76,23 @@ class WebScraping:
             delete_directory(self.output_dir)
         check_or_create_dir(self.output_dir)
 
-    def retrieve_all_info(self, news_item, prompt, country, risk_category, commodity, lang, data_source):
+    def retrieve_all_info(self, news_item: dict, prompt: str, country: str, risk_category: str, commodity: str, lang: str, data_source: str) -> list:
+        """Retrieves all relevant information from a news item.
 
-        download_state, article_text = self.fetch_article_text(news_item['url'])
-        manual_check_suggested, reason_for_manual_check = self.manual_check_aplicability(download_state, article_text)
+        Args:
+            news_item (dict): A news item dictionary.
+            prompt (str): The prompt used for fetching the news item.
+            country (str): The country related to the news item.
+            risk_category (str): The risk category related to the news item.
+            commodity (str): The commodity related to the news item.
+            lang (str): The language of the news item.
+            data_source (str): The data source of the news item.
+
+        Returns:
+            list: A list of all retrieved information.
+        """
+        article_text, download_state = self.fetch_article_text(news_item['url'])
+        manual_check_suggested, reason_for_manual_check = self.manual_check_applicability(download_state, article_text)
 
         result = [
             country,
@@ -96,7 +114,16 @@ class WebScraping:
 
         return result
 
-    def fetch_article_text(self, news_item_url, retries=3):
+    def fetch_article_text(self, news_item_url: str, retries: int = 3) -> tuple:
+        """Fetches and sanitizes the text of an article from its URL.
+
+        Args:
+            news_item_url (str): The URL of the news item.
+            retries (int): Number of retries for fetching the article text.
+
+        Returns:
+            tuple: A tuple containing the download state and sanitized text.
+        """
         for _ in range(retries):
             try:
                 article = Article(news_item_url, http_success_only=False, fetch_images=False, language=self.DEFAULT_PROMPT_LANG)
@@ -107,9 +134,17 @@ class WebScraping:
                 last_exception = e
                 time.sleep(2)
         return str(last_exception), None
-    
-    def manual_check_aplicability(self, download_state, article_text): 
 
+    def manual_check_applicability(self, download_state: str, article_text: str) -> tuple:
+        """Determines if a manual check is suggested and provides the reason.
+
+        Args:
+            download_state (str): The state of the article download.
+            article_text (str): The text of the article.
+
+        Returns:
+            tuple: A tuple containing the manual check suggestion (bool) and the reason (str).
+        """
         download_successful = download_state == 'Success'
         text_meets_length_requirement = len(article_text) >= self.text_length_threshold
 
@@ -126,30 +161,74 @@ class WebScraping:
         return manual_check_suggested, reason_for_manual_check
 
     @staticmethod
-    def sanitize_text(text):
+    def sanitize_text(text: str) -> str:
+        """Sanitizes the text by removing non-ASCII characters.
+
+        Args:
+            text (str): The text to sanitize.
+
+        Returns:
+            str: The sanitized text.
+        """
         return re.sub(r'[^\x00-\x7F]+', ' ', text)
 
     @staticmethod
-    def format_publisher(publisher_info):
+    def format_publisher(publisher_info: dict) -> str:
+        """Formats the publisher information.
+
+        Args:
+            publisher_info (dict): The publisher information.
+
+        Returns:
+            str: The formatted publisher information.
+        """
         if isinstance(publisher_info, dict):
             return publisher_info.get('title', 'Unknown')
         return publisher_info
 
     @staticmethod
-    def format_date(date_str):
+    def format_date(date_str: str) -> str:
+        """Formats the date string to a standard format.
+
+        Args:
+            date_str (str): The date string.
+
+        Returns:
+            str: The formatted date string.
+        """
         try:
             date_obj = datetime.strptime(date_str, '%a, %d %b %Y %H:%M:%S %Z')
             return date_obj.strftime('%b %Y')
         except ValueError:
             return date_str
 
-    def retrieve_web_scraping_info_per_country_risk(self, country_risk_articles, country_risk_prompts, country, risk_category):
-        return [
-            self.retrieve_all_info(news_item, prompt, country, risk_category, self.DEFAULT_COMMODITY, self.DEFAULT_PROMPT_LANG, self.DEFAULT_DATA_SOURCE)
-            for news_item, prompt in zip(country_risk_articles, country_risk_prompts)
-        ]
+    def retrieve_web_scraping_info_per_country_risk(self, country_risk_articles: list, country_risk_prompts: list, country: str, risk_category: str) -> list:
+        """Retrieves web scraping information for each country and risk category.
+
+        Args:
+            country_risk_articles (list): List of articles for the country and risk category.
+            country_risk_prompts (list): List of prompts for the country and risk category.
+            country (str): The country for which the information is retrieved.
+            risk_category (str): The risk category for which the information is retrieved.
+
+        Returns:
+            list: A list of retrieved information.
+        """
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_news_item = {
+                executor.submit(self.retrieve_all_info, news_item, prompt, country, risk_category, self.DEFAULT_COMMODITY, self.DEFAULT_PROMPT_LANG, self.DEFAULT_DATA_SOURCE): news_item
+                for news_item, prompt in zip(country_risk_articles, country_risk_prompts)
+            }
+            results = []
+            for future in as_completed(future_to_news_item):
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    self.logger.error(f'Generated an exception: {exc}')
+            return results
 
     def run(self) -> None:
+        """Executes the web scraping process."""
         google_news = GNews(language=self.DEFAULT_PROMPT_LANG, start_date=self.start_date, end_date=self.end_date, max_results=self.max_results)
 
         previous_country = None
