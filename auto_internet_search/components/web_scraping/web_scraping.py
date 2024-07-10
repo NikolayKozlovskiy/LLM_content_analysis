@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from gnews import GNews
 from newspaper import Article
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from auto_internet_search.core.functions import delete_directory, check_or_create_dir, save_to_excel_country_risk_level
 from auto_internet_search.core.constants.risk_categories import RiskCategories
@@ -62,7 +63,8 @@ class WebScraping:
         self.start_date = self.config.geteval("start_date")
         self.end_date = self.config.geteval("end_date", fallback=datetime.now())
         self.max_results = self.config.getint("max_results", fallback=20)
-        self.text_length_threshold = self.config.getint("text_length_threshold", fallback=50)  # Add this line
+        self.text_length_threshold = self.config.getint("text_length_threshold", fallback=50)
+        self.max_workers = self.config.getint("max_workers", fallback=5)  # Add this line
 
         self.do_clear_output = self.config.getboolean("do_clear_output", fallback=False)
         self.output_dir = self.config.get("output_dir")
@@ -144,10 +146,18 @@ class WebScraping:
             return date_str
 
     def retrieve_web_scraping_info_per_country_risk(self, country_risk_articles, country_risk_prompts, country, risk_category):
-        return [
-            self.retrieve_all_info(news_item, prompt, country, risk_category, self.DEFAULT_COMMODITY, self.DEFAULT_PROMPT_LANG, self.DEFAULT_DATA_SOURCE)
-            for news_item, prompt in zip(country_risk_articles, country_risk_prompts)
-        ]
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_news_item = {
+                executor.submit(self.retrieve_all_info, news_item, prompt, country, risk_category, self.DEFAULT_COMMODITY, self.DEFAULT_PROMPT_LANG, self.DEFAULT_DATA_SOURCE): news_item
+                for news_item, prompt in zip(country_risk_articles, country_risk_prompts)
+            }
+            results = []
+            for future in as_completed(future_to_news_item):
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    self.logger.error(f'Generated an exception: {exc}')
+            return results
 
     def run(self) -> None:
         google_news = GNews(language=self.DEFAULT_PROMPT_LANG, start_date=self.start_date, end_date=self.end_date, max_results=self.max_results)
