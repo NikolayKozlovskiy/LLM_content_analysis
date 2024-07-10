@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from auto_internet_search.core.functions import delete_directory, check_or_create_dir, save_to_excel_country_risk_level
 from auto_internet_search.core.constants.risk_categories import RiskCategories
 from auto_internet_search.core.constants.key_words import KeyWords
+from auto_internet_search.core.constants.columns import ColNames
 
 
 class WebScraping:
@@ -34,6 +35,24 @@ class WebScraping:
         'chemicals_stockholm_convention': [RiskCategories.chemicals_stockholm_convention, KeyWords.chemicals_stockholm_convention]
     }
 
+    SCHEMA = [
+        ColNames.country,
+        ColNames.risk_category_full_name,
+        ColNames.commodity,
+        ColNames.lang,
+        ColNames.prompt,
+        ColNames.data_source,
+        ColNames.url,
+        ColNames.title,
+        ColNames.published_date,
+        ColNames.publisher,
+        ColNames.article_clean_text,
+        ColNames.download_state,
+        ColNames.manual_check_suggested,
+        ColNames.reason_for_manual_check,
+        ColNames.upload_time
+    ]
+
     def __init__(self, component_config) -> None:
         self.config = component_config
         self.logger = logging.getLogger(__name__)
@@ -55,7 +74,10 @@ class WebScraping:
         check_or_create_dir(self.output_dir)
 
     def retrieve_all_info(self, news_item, prompt, country, risk_category, commodity, lang, data_source):
-        article_text, download_state = self.fetch_article_text(news_item['url'])
+
+        download_state, article_text = self.fetch_article_text(news_item['url'])
+        manual_check_suggested, reason_for_manual_check = self.manual_check_aplicability(download_state, article_text)
+
         result = [
             country,
             risk_category,
@@ -69,15 +91,10 @@ class WebScraping:
             self.format_publisher(news_item.get('publisher', 'Unknown')),
             article_text,
             download_state,
+            manual_check_suggested,
+            reason_for_manual_check,
             datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         ]
-
-        text_length = len(article_text)
-        manual_check_suggested = int(download_state != 'Success' or text_length < self.text_length_threshold)
-        reason_for_manual_check = 'Download failed' if download_state != 'Success' else (
-            'Text retrieved is too small' if text_length < self.text_length_threshold else '')
-
-        result.extend([manual_check_suggested, reason_for_manual_check])
 
         return result
 
@@ -87,11 +104,28 @@ class WebScraping:
                 article = Article(news_item_url, http_success_only=False, fetch_images=False, language=self.DEFAULT_PROMPT_LANG)
                 article.download()
                 article.parse()
-                return self.sanitize_text(article.text), 'Success'
+                return 'Success', self.sanitize_text(article.text)
             except Exception as e:
                 last_exception = e
                 time.sleep(2)
-        return "", str(last_exception)
+        return str(last_exception), None
+    
+    def manual_check_aplicability(self, download_state, article_text): 
+
+        download_successful = download_state == 'Success'
+        text_meets_length_requirement = len(article_text) >= self.text_length_threshold
+
+        manual_check_suggested = True
+
+        if not download_successful:
+            reason_for_manual_check = 'download_failed'
+        elif not text_meets_length_requirement:
+            reason_for_manual_check = 'text_retrieved_is_too_small'
+        else:
+            manual_check_suggested = False
+            reason_for_manual_check = None
+
+        return manual_check_suggested, reason_for_manual_check
 
     @staticmethod
     def sanitize_text(text):
@@ -152,5 +186,5 @@ class WebScraping:
                 mode = 'w' if country != previous_country else 'a'
                 previous_country = country
 
-                save_to_excel_country_risk_level(country, risk_category, result_per_country_risk, self.output_dir, mode)
+                save_to_excel_country_risk_level(country, risk_category, result_per_country_risk, self.SCHEMA, self.output_dir, mode)
                 self.logger.info(f"Results for {country}, {risk_category} are written to {self.output_dir} directory")

@@ -45,27 +45,10 @@ def check_or_create_dir(directory: str) -> None:
         print(f"Unable to handle input directory path '{directory}': {e}")
         raise
 
-def save_to_excel_country_risk_level(country, risk_category, df, output_dir, mode):
-
-    
-    COLUMN_NAMES = [
-        ColNames.country,
-        ColNames.risk_category_full_name,
-        ColNames.commodity,
-        ColNames.lang,
-        ColNames.prompt,
-        ColNames.data_source,
-        ColNames.url,
-        ColNames.title,
-        ColNames.published_date,
-        ColNames.publisher,
-        ColNames.article_clean_text,
-        ColNames.download_state,
-        ColNames.upload_time
-    ]
+def save_to_excel_country_risk_level(country, risk_category, df, schema, output_dir, mode):
 
     file_path = f'{output_dir}/{country}.xlsx'
     with pd.ExcelWriter(file_path, engine='openpyxl', mode=mode) as writer:
-            df = pd.DataFrame(df, columns=COLUMN_NAMES)
+            df = pd.DataFrame(df, columns=schema)
             df.to_excel(writer, sheet_name=risk_category, index=False)
 
