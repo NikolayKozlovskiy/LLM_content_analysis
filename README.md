@@ -1,4 +1,4 @@
-# dkv_auto_search
+# Content Analysis of Google News Articles with LLMs
 A repo to perform news' social risk analysis
 
 ## Deployment
